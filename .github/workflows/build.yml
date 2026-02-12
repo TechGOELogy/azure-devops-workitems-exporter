@@ -39,10 +39,9 @@ jobs:
             --collect:"XPlat Code Coverage"
       - name: LS Files
         run: ls -lR
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+      - name: Publish Cobertura Report
+        uses: 5monkeys/cobertura-action@v1
         with:
-          name: coverage-report
           path: "**/coverage.cobertura.xml"
 
       - name: Publish Linux executable
