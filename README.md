@@ -45,10 +45,9 @@ Word/PDF templates treat each text line as a paragraph/line; adjust spacing with
 
 ## Contribution
 
-1. Follow the CLI semantics in `Problem/problem-statement.md` and `docs/design.md` (includes logging, templating, and export behaviors).
-2. Update templates under `template-examples/` for new formats (use Scriban).
-3. Add tests when you touch export logic (`tests/AzureDevOpsWorkItemExporter.Tests` has helpers for logging, config loader, etc.).
-4. Keep version increments in `.csproj` + README release notes.
+1. Update templates under `template-examples/` for new formats (use Scriban).
+2. Add tests when you touch export logic (`tests/AzureDevOpsWorkItemExporter.Tests` has helpers for logging, config loader, etc.).
+3. Keep version increments in `.csproj` + README release notes.
 
 ## License
 

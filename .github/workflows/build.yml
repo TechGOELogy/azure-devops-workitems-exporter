@@ -43,6 +43,8 @@ jobs:
             -p:CollectCoverage=true \
             -p:CoverletOutputFormat=cobertura \
             -p:CoverletOutput=$COVERAGE_PATH
+      - name: LS Files
+        run: ls -lR
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
@@ -83,20 +85,3 @@ jobs:
         with:
           name: azure-devops-workitems-exporter-win
           path: artifacts/windows
-
-  deploy-pages:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          publish_branch: gh-pages
-          user_name: GitHub Actions
-          user_email: actions@github.com
