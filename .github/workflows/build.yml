@@ -32,17 +32,13 @@ jobs:
         run: dotnet build azure-devops-workitems-exporter.slnx --configuration Release --no-restore
 
       - name: Run unit tests & collect coverage
-        env:
-          COVERAGE_PATH: ${{ github.workspace }}/coverage/coverage.xml
         run: |
-          mkdir -p coverage
-          mkdir -p "$(dirname "$COVERAGE_PATH")"
           dotnet test ./tests/AzureDevOpsWorkItemExporter.Tests/AzureDevOpsWorkitemsExporter.Tests.csproj \
             --configuration Release \
             --no-build \
             -p:CollectCoverage=true \
             -p:CoverletOutputFormat=cobertura \
-            -p:CoverletOutput=$COVERAGE_PATH
+            -p:CoverletOutput=coverage.xml
       - name: LS Files
         run: ls -lR
       - name: Upload coverage report
