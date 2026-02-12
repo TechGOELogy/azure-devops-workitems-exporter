@@ -40,7 +40,7 @@ jobs:
       - name: LS Files
         run: ls -lR
       - name: Publish Cobertura Report
-        uses: 5monkeys/cobertura-action@v1
+        uses: 5monkeys/cobertura-action@v14
         with:
           path: "**/coverage.cobertura.xml"
 
