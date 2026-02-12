@@ -1,0 +1,43 @@
+<html>
+  <head>
+    <title> Work Item Export </title>
+  </head>
+  <body>
+    {{ for work_item in work_items }}
+      <h2> {{ work_item.fields["System.WorkItemType"] }} - {{ work_item.fields["System.Id"] }} : {{ work_item.fields["System.Title"] }} </h2>
+      <b> State </b> : {{ work_item.fields["System.State"] ?? "Undefined" }} <br>
+      <b> Assigned To </b> : &nbsp;
+      {{ assigned = work_item.fields["System.AssignedTo"] }}
+      {{ display_name = "" }}
+
+      {{ for item in assigned }}
+        {{ if item.key == "displayName" }}
+          {{ display_name = item.value }}
+        {{ end }}
+      {{ end }}
+
+      {{ display_name }}
+
+      <br>
+
+      {{ if work_item.parents.size > 0 }}
+        {{ for parent in work_item.parents }}
+          <h3> {{ parent.fields["System.WorkItemType"] }} - {{ parent.fields["System.Id"] }} : {{ parent.fields["System.Title"] }} </h3>
+          <b> State </b> : {{ parent.fields["System.State"] ?? "Undefined" }} <br>
+          <b> Assigned To </b> : &nbsp;
+          {{ assigned = work_item.fields["System.AssignedTo"] }}
+          {{ display_name = "" }}
+
+          {{ for item in assigned }}
+            {{ if item.key == "displayName" }}
+              {{ display_name = item.value }}
+            {{ end }}
+          {{ end }}
+
+          {{ display_name }}
+        {{ end }}
+      {{ end }}
+
+    {{ end }}
+  </body>
+</html>

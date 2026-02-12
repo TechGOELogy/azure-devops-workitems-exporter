@@ -1,0 +1,42 @@
+## Build artifacts
+bin/
+obj/
+
+## Rider/IDE
+.idea/
+
+## Visual Studio
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Visual Studio Code
+.vscode/
+
+## .NET Core
+*.dotCover
+*.ncrunch*
+*.coverage
+*.vsmdi
+*.testsettings
+*.builds
+*.log
+*.dbmdl
+
+## NuGet
+*.nupkg
+*.snupkg
+project.lock.json
+packages/
+**/packages/
+
+## Docs and problem statements
+planning/
+
+## Temporary files
+*.tmp
+~$*
+
+## Logs
+*.log

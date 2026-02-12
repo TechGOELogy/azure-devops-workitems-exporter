@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AzureDevOpsWorkItemExporter/AzureDevOpsWorkitemsExporter.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AzureDevOpsWorkItemExporter.Tests/AzureDevOpsWorkitemsExporter.Tests.csproj" />
+  </Folder>
+</Solution>

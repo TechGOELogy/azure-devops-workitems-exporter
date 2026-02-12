@@ -1,0 +1,40 @@
+{{~ # Word template (text-based; each line becomes a paragraph) ~}}
+{{~ if export_meta.title ~}}
+{{ export_meta.title }}
+{{~ end ~}}
+Generated: {{ export_meta.generated_at }}
+Organization: {{ export_meta.organization ?? "-" }}
+Project: {{ export_meta.project ?? "-" }}
+Query Type: {{ export_meta.query_type ?? "-" }}
+Link: {{ export_meta.link ?? "-" }}
+Depth (Parent/Child): {{ export_meta.depth_parent ?? "-" }}/{{ export_meta.depth_child ?? "-" }}
+
+{{~ for work_item in work_items ~}}
+------------------------------------------------------------
+ID: {{ work_item.id }}
+Title: {{ work_item.fields["System.Title"] ?? "Untitled" }}
+State: {{ work_item.fields["System.State"] ?? "Unknown" }}
+Assigned To: {{ work_item.fields["System.AssignedTo"] ?? "Unassigned" }}
+Level: {{ work_item.level ?? 0 }}
+
+{{~ if selected_fields.size > 0 ~}}
+Fields:
+{{~ for field in selected_fields ~}}
+- {{ field }}: {{ work_item.fields[field] ?? "-" }}
+{{~ end ~}}
+{{~ end ~}}
+
+{{~ if work_item.children.size > 0 ~}}
+Children:
+{{~ for child in work_item.children ~}}
+- {{ child.id }}: {{ child.fields["System.Title"] ?? "Untitled" }}
+{{~ end ~}}
+{{~ end ~}}
+
+{{~ if work_item.parents.size > 0 ~}}
+Parents:
+{{~ for parent in work_item.parents ~}}
+- {{ parent.id }}: {{ parent.fields["System.Title"] ?? "Untitled" }}
+{{~ end ~}}
+{{~ end ~}}
+{{~ end ~}}

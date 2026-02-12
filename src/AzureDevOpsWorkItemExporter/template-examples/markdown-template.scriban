@@ -1,0 +1,32 @@
+{{~ for work_item in work_items ~}}
+## {{ work_item.fields["System.Title"] ?? "Untitled Work Item" }} ({{ work_item.id }})
+
+**State**: {{ work_item.fields["System.State"] ?? "Unknown" }}  
+**Assigned To**: {{ work_item.fields["System.AssignedTo"] ?? "Unassigned" }}  
+**Hierarchy**: {{ work_item.level ?? 0 }} level{{ if work_item.level > 1 }}s{{ end }}
+
+| Field | Value |
+| ----- | ----- |
+{{~ for field in selected_fields ~}}
+| {{ field }} | {{ work_item.fields[field] ?? "-" }} |
+{{~ end ~}}
+
+{{~ if work_item.children.size > 0 ~}}
+**Children**:
+{{~ for child in work_item.children ~}}
+- {{ child.fields["System.Title"] ?? "No Title" }} ({{ child.id }})
+{{~ end ~}}
+{{~ end ~}}
+
+{{~ if work_item.parents.size > 0 ~}}
+**Parents**:
+{{~ for parent in work_item.parents ~}}
+- {{ parent.fields["System.Title"] ?? "No Title" }} ({{ parent.id }})
+{{~ end ~}}
+{{~ end ~}}
+
+{{~ if export_meta.additional_notes ~}}
+> Notes: {{ export_meta.additional_notes }}
+{{~ end ~}}
+
+{{ end }}

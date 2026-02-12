@@ -1,0 +1,51 @@
+## Sample configuration for the CLI exporter.
+## IMPORTANT: read this file top-to-bottom before editing; it captures the exact schema the CLI validates.
+## Save it alongside the binary (or pass it via `--config configuration.yaml`).
+
+azure-devops:
+  organization: shubhamgoel02             # Name of the Azure DevOps organization.
+  project: "Azure DevOps POC"               # Name of the project to scope the export.
+
+## type determines whether you run against a WIQL query or a single work item ID.
+## Supported values: wiql / wiid
+## wiql -> Executes the WIQL query below (flat query; relation/tree statements are not supported yet).
+## wiid -> Targets a single work item; parent/child traversal honors the `depth` block.
+type: wiid                              # Choose 'wiql' or 'wiid'.
+wiid: 4
+##wiql: >
+##  SELECT
+##    [System.Id],
+##    [System.Title],
+##    [System.State],
+##    [System.AssignedTo]
+##  FROM WorkItems
+##  WHERE [System.TeamProject] = 'ExampleProject'
+
+## Fields: `select` is required for csv/json/excel exports to define column order. Templated formats still
+## receive all fields returned by Azure DevOps regardless of `select`.
+
+select:
+- System.Id
+- System.Title
+
+# export: Specifies how much to export and in which export type(s)
+
+export:
+  link: child                        # Supported values: workitem | child | parent | both
+  type:                                 # Array of output formats. Current choices: word | excel | pdf | md | html | json | csv
+    - pdf
+    - word
+  depth:                                # Controls how far to travel in each direction.
+    parent: 1                           # Non-negative integer. Ignored if `link` excludes parents.
+    child: 1                            # Non-negative integer. Ignored if `link` excludes children.
+  retry: 3                              # Overrides the default retry count for transient failures (default 5).
+
+logging:                                # Optional overrides for history logging (JSON log per run using log4net layout).
+  verbosity: DEBUG                      # INFO | DEBUG | WARN | ERROR (INFO default).
+  location: ./export-logs               # Directory (relative to binary) where timestamped `.log` files are created.
+
+templates:
+  md: template-examples/markdown-template-child.scriban
+  html: template-examples/html-template-child.scriban
+  pdf: template-examples/pdf-template.scriban
+  word: template-examples/word-template.scriban

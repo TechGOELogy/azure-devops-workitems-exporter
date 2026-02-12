@@ -1,0 +1,37 @@
+{{~ # PDF template (text-based; renders line-by-line) ~}}
+{{~ if export_meta.title ~}}
+{{ export_meta.title }}
+{{~ end ~}}
+Generated: {{ export_meta.generated_at }}
+Project: {{ export_meta.organization ?? "-" }}/{{ export_meta.project ?? "-" }}
+{{~ if export_meta.formats && export_meta.formats.size > 0 ~}}
+Formats: {{~ for f in export_meta.formats ~}}{{ if for.index > 0 }}, {{ end }}{{ f }}{{~ end ~}}
+{{~ end ~}}
+
+{{~ for work_item in work_items ~}}
+ID {{ work_item.id }} | {{ work_item.fields["System.Title"] ?? "Untitled" }}
+State: {{ work_item.fields["System.State"] ?? "Unknown" }} | Assigned: {{ work_item.fields["System.AssignedTo"] ?? "Unassigned" }}
+Level: {{ work_item.level ?? 0 }}
+
+{{~ if selected_fields.size > 0 ~}}
+{{~ for field in selected_fields ~}}
+{{ field }}: {{ work_item.fields[field] ?? "-" }}
+{{~ end ~}}
+{{~ end ~}}
+
+{{~ if work_item.children.size > 0 ~}}
+Children:
+{{~ for child in work_item.children ~}}
+- {{ child.id }}: {{ child.fields["System.Title"] ?? "Untitled" }}
+{{~ end ~}}
+{{~ end ~}}
+
+{{~ if work_item.parents.size > 0 ~}}
+Parents:
+{{~ for parent in work_item.parents ~}}
+- {{ parent.id }}: {{ parent.fields["System.Title"] ?? "Untitled" }}
+{{~ end ~}}
+{{~ end ~}}
+
+------------------------------------------------------------
+{{~ end ~}}

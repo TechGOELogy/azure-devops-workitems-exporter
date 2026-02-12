@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Azure DevOps Export - {{ export_meta.title ?? "Work Items" }}</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; }
+      .work-item { border-bottom: 1px solid #ccc; padding: 1rem 0; }
+      .header { display: flex; justify-content: space-between; flex-wrap: wrap; }
+      table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+      th, td { border: 1px solid #ddd; padding: 0.25rem 0.5rem; text-align: left; }
+      th { background: #f4f4f4; }
+    </style>
+  </head>
+  <body>
+    <h1>Exported Work Items</h1>
+    <p>{{ export_meta.summary ?? "Generated via the Azure DevOps CLI exporter." }}</p>
+
+    {{ for work_item in work_items }}
+      <section class="work-item">
+        <div class="header">
+          <div>
+            <strong>#{{ work_item.id }}</strong>: {{ work_item.fields["System.Title"] ?? "Untitled" }}
+          </div>
+          <div>
+            State: {{ work_item.fields["System.State"] ?? "Unknown" }} |
+            Assigned To: {{ work_item.fields["System.AssignedTo"] ?? "Unassigned" }}
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ for field in selected_fields }}
+              <tr>
+                <td>{{ field }}</td>
+                <td>{{ work_item.fields[field] ?? "&nbsp;" }}</td>
+              </tr>
+            {{ end }}
+          </tbody>
+        </table>
+
+        {{ if work_item.children.size > 0 }}
+          <div>
+            <strong>Children:</strong>
+            <ul>
+              {{ for child in work_item.children }}
+                <li>#{{ child.id }}: {{ child.fields["System.Title"] ?? "Untitled" }}</li>
+              {{ end }}
+            </ul>
+          </div>
+        {{ end }}
+
+        {{ if work_item.parents.size > 0 }}
+          <div>
+            <strong>Parents:</strong>
+            <ul>
+              {{ for parent in work_item.parents }}
+                <li>#{{ parent.id }}: {{ parent.fields["System.Title"] ?? "Untitled" }}</li>
+              {{ end }}
+            </ul>
+          </div>
+        {{ end }}
+      </section>
+    {{ end }}
+
+    {{ if export_meta.generated_at }}
+      <footer>
+        <small>Generated on {{ export_meta.generated_at }}</small>
+      </footer>
+    {{ end }}
+  </body>
+</html>

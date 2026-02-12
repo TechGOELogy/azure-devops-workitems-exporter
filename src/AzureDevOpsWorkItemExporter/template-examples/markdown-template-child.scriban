@@ -1,0 +1,32 @@
+# Azure DevOps Workitem Export    
+{{ for work_item in work_items }}
+## {{ work_item.fields["System.WorkItemType"] }} - {{ work_item.fields["System.Id"] }} : {{ work_item.fields["System.Title"] }}    
+**State** : {{ work_item.fields["System.State"] ?? "Undefined" }}    
+{{ assigned = work_item.fields["System.AssignedTo"] }}
+{{ display_name = "" }}
+
+{{ for item in assigned }}
+{{ if item.key == "displayName" }}
+    {{ display_name = item.value }}
+{{ end }}
+{{ end }}
+
+**Assigned To** : {{ display_name }}    
+
+{{ if work_item.children.size > 0 }}
+{{ for child in work_item.children }}
+### {{ child.fields["System.WorkItemType"] }} - {{ child.fields["System.Id"] }} : {{ child.fields["System.Title"] }}    
+**State** : {{ child.fields["System.State"] ?? "Undefined" }}    
+{{ assigned = work_item.fields["System.AssignedTo"] }}
+{{ display_name = "" }}
+
+{{ for item in assigned }}
+{{ if item.key == "displayName" }}
+    {{ display_name = item.value }}
+{{ end }}
+{{ end }}
+**Assigned To** : {{ display_name }}    
+{{ end }}
+{{ end }}
+
+{{ end }}
