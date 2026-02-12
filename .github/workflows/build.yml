@@ -32,21 +32,27 @@ jobs:
         run: dotnet build azure-devops-workitems-exporter.slnx --configuration Release --no-restore
 
       - name: Run unit tests & collect coverage
+        env:
+          COVERAGE_PATH: ${{ github.workspace }}/coverage/coverage.xml
         run: |
+          mkdir -p coverage
+          mkdir -p "$(dirname "$COVERAGE_PATH")"
           dotnet test ./tests/AzureDevOpsWorkItemExporter.Tests/AzureDevOpsWorkitemsExporter.Tests.csproj \
             --configuration Release \
             --no-build \
             -p:CollectCoverage=true \
             -p:CoverletOutputFormat=cobertura \
-            -p:CoverletOutput=coverage/coverage.xml
+            -p:CoverletOutput=$COVERAGE_PATH
       - name: Upload coverage report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/coverage.xml
 
       - name: Publish Linux executable
-        run: dotnet publish src/AzureDevOpsWorkItemExporter/AzureDevOpsWorkitemsExporter.csproj \
+        run: dotnet publish \
+          --project src/AzureDevOpsWorkItemExporter/AzureDevOpsWorkitemsExporter.csproj \
           --configuration Release \
           --runtime linux-x64 \
           --self-contained true \
@@ -54,7 +60,8 @@ jobs:
           --output ./artifacts/linux
 
       - name: Publish Windows executable
-        run: dotnet publish src/AzureDevOpsWorkItemExporter/AzureDevOpsWorkitemsExporter.csproj \
+        run: dotnet publish \
+          --project src/AzureDevOpsWorkItemExporter/AzureDevOpsWorkitemsExporter.csproj \
           --configuration Release \
           --runtime win-x64 \
           --self-contained true \
@@ -72,3 +79,22 @@ jobs:
         with:
           name: azure-devops-workitems-exporter-win
           path: artifacts/windows
+
+  deploy-pages:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v2
