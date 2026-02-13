@@ -40,3 +40,6 @@ planning/
 
 ## Logs
 *.log
+
+## coverage
+coverage.*.xml
