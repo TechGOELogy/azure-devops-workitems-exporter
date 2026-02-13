@@ -124,6 +124,11 @@ jobs:
             /p:InformationalVersion=${{ env.BUILD_VERSION }} \
             --output ${{ github.workspace }}/artifacts/windows
 
+      - name: Copy sample configuration into artifacts
+        run: |
+          cp configuration.yaml ${{ github.workspace }}/artifacts/linux/
+          cp configuration.yaml ${{ github.workspace }}/artifacts/windows/
+
       - name: Upload linux artifact
         uses: actions/upload-artifact@v4
         with:
