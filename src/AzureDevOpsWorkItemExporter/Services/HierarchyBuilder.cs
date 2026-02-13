@@ -5,12 +5,12 @@ using AzureDevOpsWorkItemExporter.Configuration;
 
 namespace AzureDevOpsWorkItemExporter.Services;
 
-public sealed class HierarchyBuilder
+public static class HierarchyBuilder
 {
     private static readonly string ChildLink = "System.LinkTypes.Hierarchy-Forward";
     private static readonly string ParentLink = "System.LinkTypes.Hierarchy-Reverse";
 
-    public IReadOnlyList<WorkItemNode> BuildHierarchy(IReadOnlyList<WorkItemNode> nodes, ExportDefinition exportDefinition)
+    public static IReadOnlyList<WorkItemNode> BuildHierarchy(IReadOnlyList<WorkItemNode> nodes, ExportDefinition exportDefinition)
     {
         if (nodes.Count == 0)
         {
@@ -18,13 +18,28 @@ public sealed class HierarchyBuilder
         }
 
         var nodesById = nodes.ToDictionary(n => n.Id);
+        ResetNodes(nodes);
+        PopulateRelations(nodes, nodesById);
+
+        var (parentDepth, childDepth) = ResolveDepths(exportDefinition);
+        var seedNodes = ResolveSeedNodes(nodes);
+        AssignLevels(seedNodes, parentDepth, childDepth);
+
+        return seedNodes;
+    }
+
+    private static void ResetNodes(IReadOnlyList<WorkItemNode> nodes)
+    {
         foreach (var node in nodes)
         {
             node.Children.Clear();
             node.Parents.Clear();
             node.Level = null;
         }
+    }
 
+    private static void PopulateRelations(IEnumerable<WorkItemNode> nodes, IReadOnlyDictionary<int, WorkItemNode> nodesById)
+    {
         foreach (var node in nodes)
         {
             foreach (var relation in node.Relations)
@@ -36,41 +51,42 @@ public sealed class HierarchyBuilder
 
                 if (IsChildRelation(relation.Type))
                 {
-                    if (!node.Children.Contains(target))
-                    {
-                        node.Children.Add(target);
-                    }
-
-                    if (!target.Parents.Contains(node))
-                    {
-                        target.Parents.Add(node);
-                    }
+                    AddRelation(node.Children, target);
+                    AddRelation(target.Parents, node);
                 }
                 else if (IsParentRelation(relation.Type))
                 {
-                    if (!node.Parents.Contains(target))
-                    {
-                        node.Parents.Add(target);
-                    }
-
-                    if (!target.Children.Contains(node))
-                    {
-                        target.Children.Add(node);
-                    }
+                    AddRelation(node.Parents, target);
+                    AddRelation(target.Children, node);
                 }
             }
         }
+    }
 
+    private static void AddRelation(List<WorkItemNode> list, WorkItemNode target)
+    {
+        if (!list.Contains(target))
+        {
+            list.Add(target);
+        }
+    }
+
+    private static (int ParentDepth, int ChildDepth) ResolveDepths(ExportDefinition exportDefinition)
+    {
         var link = exportDefinition.Link?.Trim().ToLowerInvariant() ?? "workitem";
         var parentDepth = ShouldIncludeParent(link) ? exportDefinition.Depth.Parent ?? 0 : 0;
         var childDepth = ShouldIncludeChild(link) ? exportDefinition.Depth.Child ?? 0 : 0;
+        return (parentDepth, childDepth);
+    }
 
+    private static List<WorkItemNode> ResolveSeedNodes(IReadOnlyList<WorkItemNode> nodes)
+    {
         var seedNodes = nodes.Where(n => n.IsSeed).ToList();
-        if (seedNodes.Count == 0)
-        {
-            seedNodes = nodes.ToList();
-        }
+        return seedNodes.Count == 0 ? nodes.ToList() : seedNodes;
+    }
 
+    private static void AssignLevels(IEnumerable<WorkItemNode> seedNodes, int parentDepth, int childDepth)
+    {
         foreach (var seed in seedNodes)
         {
             seed.Level = 0;
@@ -85,8 +101,6 @@ public sealed class HierarchyBuilder
                 AssignChildLevels(seed, childDepth, new HashSet<int>());
             }
         }
-
-        return seedNodes;
     }
 
     private static void AssignChildLevels(WorkItemNode node, int remainingDepth, HashSet<int> visited)

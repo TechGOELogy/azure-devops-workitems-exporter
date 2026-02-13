@@ -13,6 +13,9 @@ namespace AzureDevOpsWorkItemExporter.Tests.Services;
 
 public class ExportOrchestratorTests
 {
+    private static readonly string[] DefaultFormats = { "md" };
+    private static readonly string[] HtmlFormats = { "html" };
+
     private static ConfigRoot CreateSampleConfig(IEnumerable<string>? types = null)
     {
         return new ConfigRoot
@@ -26,7 +29,7 @@ public class ExportOrchestratorTests
             Export = new ExportDefinition
             {
                 Link = "workitem",
-                Type = (types ?? new[] { "md" }).ToList(),
+                Type = (types ?? DefaultFormats).ToList(),
                 Retry = 1
             }
         };
@@ -53,7 +56,7 @@ public class ExportOrchestratorTests
     {
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         var orchestrator = CreateOrchestrator(tempDir);
-        var config = CreateSampleConfig(new[] { "html" });
+        var config = CreateSampleConfig(HtmlFormats);
 
         var result = await orchestrator.ExecuteAsync(config, "PAT", CancellationToken.None);
 
@@ -72,13 +75,13 @@ public class ExportOrchestratorTests
             ["html"] = Path.Combine(templateBase, "html-template.scriban")
         };
         var exporter = new FormatExporterService(renderer, templatePaths);
-        return new ExportOrchestrator(new AzureDevOpsClient(), new HierarchyBuilder(), exporter, outputDir);
+        return new ExportOrchestrator(new AzureDevOpsClient(), exporter, outputDir);
     }
 
     private static string LocateRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !dir.GetFiles("*.sln*").Any())
+        while (dir != null && dir.GetFiles("*.sln*").Length == 0)
         {
             dir = dir.Parent;
         }

@@ -172,7 +172,7 @@ public sealed class AzureDevOpsHttpClient : IAzureDevOpsClient
         return $"{org}/{project}/_apis/wit/wiql?api-version=7.0";
     }
 
-    private string BuildWorkItemsUri(ConfigRoot config, int[] ids)
+    private static string BuildWorkItemsUri(ConfigRoot config, int[] ids)
     {
         var org = Uri.EscapeDataString(config.AzureDevOps!.Organization ?? string.Empty);
         var project = Uri.EscapeDataString(config.AzureDevOps.Project ?? string.Empty);
@@ -180,7 +180,7 @@ public sealed class AzureDevOpsHttpClient : IAzureDevOpsClient
         return $"{org}/{project}/_apis/wit/workitems?ids={idsParam}&api-version=7.0";
     }
 
-    private string BuildWorkItemsRelationsUri(ConfigRoot config, int[] ids)
+    private static string BuildWorkItemsRelationsUri(ConfigRoot config, int[] ids)
     {
         var org = Uri.EscapeDataString(config.AzureDevOps!.Organization ?? string.Empty);
         var project = Uri.EscapeDataString(config.AzureDevOps.Project ?? string.Empty);
@@ -369,31 +369,13 @@ public sealed class AzureDevOpsHttpClient : IAzureDevOpsClient
         while (queue.Count > 0)
         {
             var (currentId, depth) = queue.Dequeue();
-            if (depth <= 0)
+            var detail = await EnsureDetailAsync(config, cache, currentId, cancellationToken);
+            if (detail is null)
             {
                 continue;
             }
 
-            if (!cache.TryGetValue(currentId, out var detail))
-            {
-                await EnsureNodesAsync(config, new[] { currentId }, cache, cancellationToken);
-                if (!cache.TryGetValue(currentId, out detail))
-                {
-                    continue;
-                }
-            }
-
-            var targets = detail.Relations?
-                .Where(link => MatchesDirection(link.Rel, direction))
-                .Select(link =>
-                {
-                    return TryExtractTargetId(link.Url, out var targetId) ? (int?)targetId : null;
-                })
-                .Where(id => id.HasValue)
-                .Select(id => id!.Value)
-                .Distinct()
-                .ToArray() ?? Array.Empty<int>();
-
+            var targets = GetTargetIds(detail, direction);
             if (targets.Length == 0)
             {
                 continue;
@@ -426,6 +408,37 @@ public sealed class AzureDevOpsHttpClient : IAzureDevOpsClient
             scheduledDepth[id] = depth;
             queue.Enqueue((id, depth));
         }
+    }
+
+    private async Task<WorkItemDetail?> EnsureDetailAsync(
+        ConfigRoot config,
+        Dictionary<int, WorkItemDetail> cache,
+        int currentId,
+        CancellationToken cancellationToken)
+    {
+        if (cache.TryGetValue(currentId, out var detail))
+        {
+            return detail;
+        }
+
+        await EnsureNodesAsync(config, new[] { currentId }, cache, cancellationToken);
+        return cache.TryGetValue(currentId, out detail) ? detail : null;
+    }
+
+    private static int[] GetTargetIds(WorkItemDetail detail, RelationDirection direction)
+    {
+        if (detail.Relations is null || detail.Relations.Count == 0)
+        {
+            return Array.Empty<int>();
+        }
+
+        return detail.Relations
+            .Where(link => MatchesDirection(link.Rel, direction))
+            .Select(link => TryExtractTargetId(link.Url, out var targetId) ? (int?)targetId : null)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
     }
 
     private static bool MatchesDirection(string relationType, RelationDirection direction)

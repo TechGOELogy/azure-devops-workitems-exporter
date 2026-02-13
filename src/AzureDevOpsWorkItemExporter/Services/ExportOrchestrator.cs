@@ -11,18 +11,15 @@ namespace AzureDevOpsWorkItemExporter.Services;
 public sealed class ExportOrchestrator
 {
     private readonly IAzureDevOpsClient _client;
-    private readonly HierarchyBuilder _builder;
     private readonly Templates.FormatExporterService _exporter;
     private readonly string _outputDirectory;
 
     public ExportOrchestrator(
         IAzureDevOpsClient client,
-        HierarchyBuilder builder,
         Templates.FormatExporterService exporter,
         string? outputDirectory = null)
     {
         _client = client;
-        _builder = builder;
         _exporter = exporter;
         _outputDirectory = outputDirectory ?? Path.Combine(AppContext.BaseDirectory, "export-outputs");
     }
@@ -48,7 +45,7 @@ public sealed class ExportOrchestrator
             };
         }
 
-        var hierarchy = _builder.BuildHierarchy(nodes, hierarchyDefinition);
+        var hierarchy = HierarchyBuilder.BuildHierarchy(nodes, hierarchyDefinition);
 
         var selectedFields = (config.Select ?? new List<string>())
             .Where(field => !string.IsNullOrWhiteSpace(field))
@@ -102,11 +99,11 @@ public sealed class ExportOrchestrator
             var targetPath = Path.Combine(_outputDirectory, fileName);
             if (artifact.Bytes is not null)
             {
-                File.WriteAllBytes(targetPath, artifact.Bytes);
+                await File.WriteAllBytesAsync(targetPath, artifact.Bytes, cancellationToken);
             }
             else
             {
-                File.WriteAllText(targetPath, artifact.Text ?? string.Empty);
+                await File.WriteAllTextAsync(targetPath, artifact.Text ?? string.Empty, cancellationToken);
             }
             savedPaths[format] = targetPath;
         }
@@ -159,7 +156,7 @@ public sealed class ExportOrchestrator
         return $".{normalized}";
     }
 
-    private static IReadOnlyDictionary<string, string> FormatExtensions { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    private static Dictionary<string, string> FormatExtensions { get; } = new(StringComparer.OrdinalIgnoreCase)
     {
         ["md"] = ".md",
         ["markdown"] = ".md",

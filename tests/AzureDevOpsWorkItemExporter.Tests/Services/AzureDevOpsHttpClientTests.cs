@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 using AzureDevOpsWorkItemExporter.Configuration;
 using AzureDevOpsWorkItemExporter.Services;
 using Xunit;
@@ -314,6 +315,222 @@ public class AzureDevOpsHttpClientTests
         Assert.Equal(3, handler.RequestUris.Count);
     }
 
+    [Fact]
+    public async Task FetchWorkItemsAsync_ThrowsWhenPatMissing()
+    {
+        var config = new ConfigRoot
+        {
+            AzureDevOps = new AzureDevOpsConfig
+            {
+                Organization = "org",
+                Project = "proj"
+            },
+            Type = "wiid",
+            Wiid = "1",
+            Export = new ExportDefinition { Link = "workitem", Type = new List<string> { "html" }, Retry = 0 }
+        };
+
+        var client = new AzureDevOpsHttpClient(new HttpClient(new SequenceHandler()));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.FetchWorkItemsAsync(config, string.Empty, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task FetchWorkItemsAsync_InvalidType_Throws()
+    {
+        var config = new ConfigRoot
+        {
+            AzureDevOps = new AzureDevOpsConfig
+            {
+                Organization = "org",
+                Project = "proj"
+            },
+            Type = "unknown",
+            Export = new ExportDefinition { Link = "workitem", Type = new List<string> { "html" }, Retry = 0 }
+        };
+
+        var client = new AzureDevOpsHttpClient(new HttpClient(new SequenceHandler()));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.FetchWorkItemsAsync(config, "PAT", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task FetchWorkItemsAsync_WiqlFailure_ThrowsHttpRequestException()
+    {
+        var config = new ConfigRoot
+        {
+            AzureDevOps = new AzureDevOpsConfig
+            {
+                Organization = "org",
+                Project = "proj"
+            },
+            Type = "wiql",
+            Wiql = "SELECT [System.Id] FROM WorkItems",
+            Export = new ExportDefinition { Link = "workitem", Type = new List<string> { "html" }, Retry = 0 }
+        };
+
+        var handler = new SequenceHandler();
+        handler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("bad query", Encoding.UTF8, "application/json") });
+
+        var client = new AzureDevOpsHttpClient(new HttpClient(handler) { BaseAddress = new Uri("https://dev.azure.com/") });
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.FetchWorkItemsAsync(config, "PAT", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task FetchWorkItemsAsync_InvalidRelationUrl_IgnoresRelation()
+    {
+        var config = new ConfigRoot
+        {
+            AzureDevOps = new AzureDevOpsConfig
+            {
+                Organization = "org",
+                Project = "proj"
+            },
+            Type = "wiid",
+            Wiid = "1",
+            Export = new ExportDefinition { Link = "workitem", Type = new List<string> { "html" }, Retry = 0 }
+        };
+
+        var workItemsJson = JsonSerializer.Serialize(new
+        {
+            value = new[]
+            {
+                new
+                {
+                    id = 1,
+                    fields = new Dictionary<string, object> { ["System.Title"] = "Root" }
+                }
+            }
+        });
+
+        var relationsJson = JsonSerializer.Serialize(new
+        {
+            value = new[]
+            {
+                new
+                {
+                    id = 1,
+                    relations = new[]
+                    {
+                        new { rel = "System.LinkTypes.Hierarchy-Forward", url = "not-a-url" }
+                    }
+                }
+            }
+        });
+
+        var handler = new SequenceHandler();
+        handler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(workItemsJson, Encoding.UTF8, "application/json") });
+        handler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(relationsJson, Encoding.UTF8, "application/json") });
+
+        var client = new AzureDevOpsHttpClient(new HttpClient(handler) { BaseAddress = new Uri("https://dev.azure.com/") });
+        var nodes = await client.FetchWorkItemsAsync(config, "PAT", CancellationToken.None);
+
+        Assert.Single(nodes);
+        Assert.Empty(nodes[0].Relations);
+    }
+
+    [Fact]
+    public async Task FetchWorkItemsAsync_ConvertsFieldTypes()
+    {
+        var config = new ConfigRoot
+        {
+            AzureDevOps = new AzureDevOpsConfig
+            {
+                Organization = "org",
+                Project = "proj"
+            },
+            Type = "wiid",
+            Wiid = "1",
+            Export = new ExportDefinition { Link = "workitem", Type = new List<string> { "html" }, Retry = 0 }
+        };
+
+        var workItemsJson = JsonSerializer.Serialize(new
+        {
+            value = new[]
+            {
+                new
+                {
+                    id = 1,
+                    fields = new Dictionary<string, object?>
+                    {
+                        ["System.Title"] = "Root",
+                        ["System.Count"] = 42,
+                        ["System.Done"] = true,
+                        ["System.Array"] = new[] { "a", "b" },
+                        ["System.Object"] = new { nested = "value" }
+                    }
+                }
+            }
+        });
+
+        var relationsJson = JsonSerializer.Serialize(new
+        {
+            value = new[]
+            {
+                new { id = 1, relations = Array.Empty<object>() }
+            }
+        });
+
+        var handler = new SequenceHandler();
+        handler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(workItemsJson, Encoding.UTF8, "application/json") });
+        handler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(relationsJson, Encoding.UTF8, "application/json") });
+
+        var client = new AzureDevOpsHttpClient(new HttpClient(handler) { BaseAddress = new Uri("https://dev.azure.com/") });
+        var nodes = await client.FetchWorkItemsAsync(config, "PAT", CancellationToken.None);
+
+        Assert.Single(nodes);
+        Assert.Equal("Root", nodes[0].Fields["System.Title"]);
+        Assert.True(nodes[0].Fields["System.Count"] is long or double);
+        Assert.IsType<bool>(nodes[0].Fields["System.Done"]);
+        Assert.IsType<List<object?>>(nodes[0].Fields["System.Array"]);
+        Assert.IsType<Dictionary<string, object?>>(nodes[0].Fields["System.Object"]);
+    }
+
+    [Fact]
+    public async Task FetchWorkItemsAsync_RetriesOnTransientException()
+    {
+        var config = new ConfigRoot
+        {
+            AzureDevOps = new AzureDevOpsConfig
+            {
+                Organization = "org",
+                Project = "proj"
+            },
+            Type = "wiid",
+            Wiid = "1",
+            Export = new ExportDefinition { Link = "workitem", Type = new List<string> { "html" }, Retry = 1 }
+        };
+
+        var workItemsJson = JsonSerializer.Serialize(new
+        {
+            value = new[]
+            {
+                new
+                {
+                    id = 1,
+                    fields = new Dictionary<string, string> { ["System.Title"] = "Root" }
+                }
+            }
+        });
+
+        var relationsJson = JsonSerializer.Serialize(new
+        {
+            value = new[]
+            {
+                new { id = 1, relations = Array.Empty<object>() }
+            }
+        });
+
+        var handler = new ThrowingSequenceHandler();
+        handler.EnqueueException(new HttpRequestException("transient"));
+        handler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(workItemsJson, Encoding.UTF8, "application/json") });
+        handler.EnqueueResponse(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(relationsJson, Encoding.UTF8, "application/json") });
+
+        var client = new AzureDevOpsHttpClient(new HttpClient(handler) { BaseAddress = new Uri("https://dev.azure.com/") });
+        var nodes = await client.FetchWorkItemsAsync(config, "PAT", CancellationToken.None);
+
+        Assert.Single(nodes);
+        Assert.Equal(3, handler.RequestCount);
+    }
+
     private sealed class SequenceHandler : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _responses = new();
@@ -334,7 +551,34 @@ public class AzureDevOpsHttpClientTests
                 throw new InvalidOperationException("No response queued.");
             }
 
-        return Task.FromResult(_responses.Dequeue());
+            return Task.FromResult(_responses.Dequeue());
+        }
     }
-}
+
+    private sealed class ThrowingSequenceHandler : HttpMessageHandler
+    {
+        private readonly Queue<object> _steps = new();
+        public int RequestCount { get; private set; }
+
+        public void EnqueueResponse(HttpResponseMessage response) => _steps.Enqueue(response);
+
+        public void EnqueueException(Exception exception) => _steps.Enqueue(exception);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            if (_steps.Count == 0)
+            {
+                throw new InvalidOperationException("No step queued.");
+            }
+
+            var step = _steps.Dequeue();
+            if (step is Exception exception)
+            {
+                throw exception;
+            }
+
+            return Task.FromResult((HttpResponseMessage)step);
+        }
+    }
 }

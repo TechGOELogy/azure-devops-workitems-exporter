@@ -41,10 +41,27 @@ public class TemplateRendererTests
         Assert.Throws<FileNotFoundException>(() => renderer.Render(missingPath, new { }));
     }
 
+    [Fact]
+    public void Render_InvalidTemplate_Throws()
+    {
+        var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.scriban");
+        File.WriteAllText(tempPath, "{{ if 1 }}");
+
+        try
+        {
+            var renderer = new TemplateRenderer(LocateRepoRoot());
+            Assert.Throws<InvalidOperationException>(() => renderer.Render(tempPath, new { }));
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+
     private static string LocateRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !dir.GetFiles("*.sln*").Any())
+        while (dir != null && dir.GetFiles("*.sln*").Length == 0)
         {
             dir = dir.Parent;
         }

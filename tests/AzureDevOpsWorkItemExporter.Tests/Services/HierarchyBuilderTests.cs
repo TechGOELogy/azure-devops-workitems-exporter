@@ -17,14 +17,13 @@ public class HierarchyBuilderTests
         root.Relations.Add(new WorkItemRelation("System.LinkTypes.Hierarchy-Forward", child.Id));
         root.Relations.Add(new WorkItemRelation("System.LinkTypes.Hierarchy-Reverse", parent.Id));
 
-        var builder = new HierarchyBuilder();
         var export = new ExportDefinition
         {
             Link = "both",
             Depth = new ExportDepth { Child = 1, Parent = 1 }
         };
 
-        var result = builder.BuildHierarchy(new[] { root, child, parent }, export);
+        var result = HierarchyBuilder.BuildHierarchy(new[] { root, child, parent }, export);
 
         Assert.Single(result);
         Assert.Same(root, result[0]);

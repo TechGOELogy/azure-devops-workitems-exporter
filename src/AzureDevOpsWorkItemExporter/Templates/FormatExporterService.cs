@@ -18,13 +18,14 @@ public sealed class FormatExporterService
     private readonly TemplateRenderer _renderer;
     private readonly IReadOnlyDictionary<string, string> _templatePaths;
 
-    private static IReadOnlyDictionary<string, string> DefaultTemplates { get; } =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["md"] = "template-examples/markdown-template.scriban",
-            ["markdown"] = "template-examples/markdown-template.scriban",
-            ["html"] = "template-examples/html-template.scriban"
-        };
+    private static readonly Dictionary<string, string> DefaultTemplates = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["md"] = "template-examples/markdown-template.scriban",
+        ["markdown"] = "template-examples/markdown-template.scriban",
+        ["html"] = "template-examples/html-template.scriban"
+    };
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public FormatExporterService(TemplateRenderer renderer, IReadOnlyDictionary<string, string>? templatePaths = null)
     {
@@ -35,16 +36,8 @@ public sealed class FormatExporterService
     public IReadOnlyDictionary<string, ExportArtifact> ExportFormattedOutputs(ExportContext context)
     {
         var results = new Dictionary<string, ExportArtifact>(StringComparer.OrdinalIgnoreCase);
-        var selectedFieldList = context.SelectedFields
-            .Where(field => !string.IsNullOrWhiteSpace(field))
-            .Select(field => field.Trim())
-            .ToList();
-        var templateContext = new
-        {
-            work_items = context.WorkItems,
-            selected_fields = selectedFieldList,
-            export_meta = context.ExportMeta
-        };
+        var selectedFieldList = NormalizeSelectedFields(context.SelectedFields);
+        var templateContext = BuildTemplateContext(context, selectedFieldList);
 
         foreach (var format in context.ExportMeta.Formats)
         {
@@ -53,49 +46,69 @@ public sealed class FormatExporterService
             var label = string.IsNullOrEmpty(trimmedFormat) ? "UNKNOWN" : trimmedFormat.ToUpperInvariant();
             ConsoleLogger.Log("info", $"{label} export started", new { Format = trimmedFormat });
 
-            ExportArtifact artifact;
-            if (normalizedKey == "csv")
-            {
-                artifact = ExportArtifact.FromText(BuildCsv(context.WorkItems, selectedFieldList));
-            }
-            else if (normalizedKey == "json")
-            {
-                artifact = ExportArtifact.FromText(BuildJson(context.WorkItems, selectedFieldList));
-            }
-            else if (normalizedKey == "excel")
-            {
-                artifact = ExportArtifact.FromBytes(BuildExcel(context.WorkItems, selectedFieldList));
-            }
-            else
-            {
-                var templatePath = ResolveTemplatePath(normalizedKey);
-                if (templatePath != null)
-                {
-                    var rendered = _renderer.Render(templatePath, templateContext);
-                    if (normalizedKey == "word")
-                    {
-                        artifact = ExportArtifact.FromBytes(BuildWord(rendered));
-                    }
-                    else if (normalizedKey == "pdf")
-                    {
-                        artifact = ExportArtifact.FromBytes(BuildPdf(rendered));
-                    }
-                    else
-                    {
-                        artifact = ExportArtifact.FromText(rendered);
-                    }
-                }
-                else
-                {
-                    artifact = ExportArtifact.FromText($"[stub] {format} export will be implemented later.");
-                }
-            }
+            var artifact = BuildArtifact(
+                normalizedKey,
+                format,
+                context.WorkItems,
+                selectedFieldList,
+                templateContext);
 
             results[format] = artifact;
             ConsoleLogger.Log("info", $"{label} export completed", new { Format = trimmedFormat });
         }
 
         return results;
+    }
+
+    private static List<string> NormalizeSelectedFields(IEnumerable<string> selectedFields)
+    {
+        return selectedFields
+            .Where(field => !string.IsNullOrWhiteSpace(field))
+            .Select(field => field.Trim())
+            .ToList();
+    }
+
+    private static object BuildTemplateContext(ExportContext context, List<string> selectedFields)
+    {
+        return new
+        {
+            work_items = context.WorkItems,
+            selected_fields = selectedFields,
+            export_meta = context.ExportMeta
+        };
+    }
+
+    private ExportArtifact BuildArtifact(
+        string normalizedKey,
+        string format,
+        IReadOnlyList<WorkItemNode> nodes,
+        IReadOnlyList<string> selectedFields,
+        object templateContext)
+    {
+        return normalizedKey switch
+        {
+            "csv" => ExportArtifact.FromText(BuildCsv(nodes, selectedFields)),
+            "json" => ExportArtifact.FromText(BuildJson(nodes, selectedFields)),
+            "excel" => ExportArtifact.FromBytes(BuildExcel(nodes, selectedFields)),
+            _ => BuildTemplateArtifact(normalizedKey, format, templateContext)
+        };
+    }
+
+    private ExportArtifact BuildTemplateArtifact(string normalizedKey, string format, object templateContext)
+    {
+        var templatePath = ResolveTemplatePath(normalizedKey);
+        if (templatePath is null)
+        {
+            return ExportArtifact.FromText($"[stub] {format} export will be implemented later.");
+        }
+
+        var rendered = _renderer.Render(templatePath, templateContext);
+        return normalizedKey switch
+        {
+            "word" => ExportArtifact.FromBytes(BuildWord(rendered)),
+            "pdf" => ExportArtifact.FromBytes(BuildPdf(rendered)),
+            _ => ExportArtifact.FromText(rendered)
+        };
     }
 
     private static string BuildCsv(IReadOnlyList<WorkItemNode> nodes, IReadOnlyList<string> selectedFields)
@@ -128,7 +141,7 @@ public sealed class FormatExporterService
             })
             .ToList();
 
-        return JsonSerializer.Serialize(rows, new JsonSerializerOptions { WriteIndented = true });
+        return JsonSerializer.Serialize(rows, JsonOptions);
     }
 
     private static byte[] BuildExcel(IReadOnlyList<WorkItemNode> nodes, IReadOnlyList<string> selectedFields)
@@ -166,12 +179,16 @@ public sealed class FormatExporterService
         using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document, true))
         {
             var mainPart = document.AddMainDocumentPart();
-            mainPart.Document = new Document(new Body());
-            var body = mainPart.Document.Body!;
+            mainPart.Document = new Document();
+            var body = mainPart.Document.AppendChild(new Body());
 
             foreach (var line in NormalizeLines(content))
             {
-                body.AppendChild(new Paragraph(new Run(new Text(line))));
+                var paragraph = new Paragraph();
+                var run = new Run();
+                run.AppendChild(new Text(line));
+                paragraph.AppendChild(run);
+                body.AppendChild(paragraph);
             }
 
             mainPart.Document.Save();

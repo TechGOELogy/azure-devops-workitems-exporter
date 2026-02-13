@@ -124,7 +124,7 @@ Templates for Word and PDF treat each newline as a paragraph/line, so control sp
 
 ## Templates Included
 
-Sample templates live in the template examples folder. See [template-examples](https://github.com/TechGOELogy/azure-devops-workitems-exporter/tree/main/src/AzureDevOpsWorkItemExporter/template-examples) for full examples and Scriban patterns. For deeper syntax and built-ins, read the [Scriban documentation](https://raw.githubusercontent.com/scriban/scriban/master/doc/language.md).
+Sample templates live in the template examples folder. See [template-examples](https://github.com/TechGOELogy/azure-devops-workitems-exporter/tree/main/src/AzureDevOpsWorkItemExporter/template-examples) for full examples and Scriban patterns. For deeper syntax and built-ins, read the [Scriban documentation](https://github.com/scriban/scriban).
 
 
 ## Logs

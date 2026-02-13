@@ -176,26 +176,30 @@ public sealed class ExecutionLogger : IDisposable
         }
 
         var sanitized = new string[args.Length];
-        for (var i = 0; i < args.Length; i++)
+        var index = 0;
+        while (index < args.Length)
         {
-            var token = args[i];
+            var token = args[index];
             if (IsPatToken(token))
             {
-                sanitized[i] = token;
-                if (i + 1 < args.Length)
+                sanitized[index] = token;
+                if (index + 1 < args.Length)
                 {
-                    sanitized[++i] = "***";
+                    sanitized[index + 1] = "***";
                 }
+                index += 2;
                 continue;
             }
 
             if (token.StartsWith("--pat=", StringComparison.OrdinalIgnoreCase))
             {
-                sanitized[i] = "--pat=***";
+                sanitized[index] = "--pat=***";
+                index++;
                 continue;
             }
 
-            sanitized[i] = token;
+            sanitized[index] = token;
+            index++;
         }
 
         return sanitized;
