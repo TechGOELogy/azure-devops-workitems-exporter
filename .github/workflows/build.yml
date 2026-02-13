@@ -61,9 +61,7 @@ jobs:
         run: |
           /tmp/scanner/dotnet-sonarscanner begin /k:"TechGOELogy_azure-devops-workitems-exporter" \
           /o:"techgoelogy" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
-          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" \
-          /d:sonar.sources=src \
-          /d:sonar.coverage.inclusions=src
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" 
 
       - name: Build
         run: dotnet build azure-devops-workitems-exporter.slnx --configuration Release --no-restore
