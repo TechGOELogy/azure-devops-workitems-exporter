@@ -11,10 +11,13 @@ on:
 
 env:
   DOTNET_VERSIONS: "net10.0"
+  VERSION_PREFIX: "1.0.0"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      BUILD_VERSION: ${{ env.VERSION_PREFIX }}.${{ github.run_id }}
 
     steps:
       - name: Checkout
@@ -64,7 +67,14 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" 
 
       - name: Build
-        run: dotnet build azure-devops-workitems-exporter.slnx --configuration Release --no-restore
+        run: |
+          dotnet build azure-devops-workitems-exporter.slnx \
+            --configuration Release \
+            --no-restore \
+            /p:Version=${{ env.BUILD_VERSION }} \
+            /p:AssemblyVersion=${{ env.BUILD_VERSION }} \
+            /p:FileVersion=${{ env.BUILD_VERSION }} \
+            /p:InformationalVersion=${{ env.BUILD_VERSION }}
 
       - name: Run unit tests & collect coverage
         run: |
@@ -94,6 +104,10 @@ jobs:
             --runtime linux-x64 \
             --self-contained true \
             /p:PublishSingleFile=true \
+            /p:Version=${{ env.BUILD_VERSION }} \
+            /p:AssemblyVersion=${{ env.BUILD_VERSION }} \
+            /p:FileVersion=${{ env.BUILD_VERSION }} \
+            /p:InformationalVersion=${{ env.BUILD_VERSION }} \
             --output ${{ github.workspace }}/artifacts/linux
 
       - name: Publish Windows executable
@@ -105,6 +119,10 @@ jobs:
             --runtime win-x64 \
             --self-contained true \
             /p:PublishSingleFile=true \
+            /p:Version=${{ env.BUILD_VERSION }} \
+            /p:AssemblyVersion=${{ env.BUILD_VERSION }} \
+            /p:FileVersion=${{ env.BUILD_VERSION }} \
+            /p:InformationalVersion=${{ env.BUILD_VERSION }} \
             --output ${{ github.workspace }}/artifacts/windows
 
       - name: Upload linux artifact
