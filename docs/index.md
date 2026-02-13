@@ -2,6 +2,10 @@
 
 *Self-contained CLI that exports Azure DevOps work items into Word, PDF, Markdown, HTML plus structured CSV/JSON/Excel using Scriban templates and configurable depth semantics.*
 
+## Attribution
+
+This tool was specifically made by GPT-5.3 Codex fully. Estimated Codex contribution: 85%.
+
 ## Home
 
 | CLI | Source |
@@ -11,13 +15,13 @@
 Use the `configuration.yaml` in the repo root (copy it, adjust your organization/project, WIQL/WIID selector, select fields, export depth, templates and logging destinations) then run the CLI using `dotnet run` or `dotnet publish` followed by the resulting executable. Each run prints:
 
 - CLI banner + version (matching `.csproj`).
-- timestamped console log lines (`[ISO timestamp] [INFO|ERROR] …`) for configuration validation, per-format export start/completion, dry runs, and failures.
+- timestamped console log lines (`[ISO timestamp] [INFO|ERROR] ...`) for configuration validation, per-format export start/completion, dry runs, and failures.
 - Binary emits JSON logs per run (configurable location, log4net-like layout, PAT masking) plus exported artifacts under `export-<timestamp>`.
 
 
 ## Features
 
-1. **Flexible selectors**: `config.type` accepts `wiql` (run a WIQL query) or `wiid` (single ID with parent/child traversal). When WIQL is specified, the `export.link` and `export.depth` blocks are ignored—the WIQL results are authoritative (but `select` still governs CSV/JSON/Excel columns).  
+1. **Flexible selectors**: `config.type` accepts `wiql` (run a WIQL query) or `wiid` (single ID with parent/child traversal). When WIQL is specified, the `export.link` and `export.depth` blocks are ignored - the WIQL results are authoritative (but `select` still governs CSV/JSON/Excel columns).  
 2. **Depth-controlled hierarchy**: specify `export.link` (child/parent/both/workitem) plus `export.depth.parent`/`export.depth.child`. Only immediate connections are fetched for structured exports, yet templates can traverse the full hierarchy.  
 3. **Multiple formats**: choose from `word`, `pdf`, `html`, `md`, `csv`, `json`, `excel` (more easily extendable via templates). PDF/Word exports use Scriban templates that treat each line as a paragraph/line; structured formats rely on selected fields.  
 4. **Template management**: declare paths under `templates` (per format) in `configuration.yaml`. Fallback templates are under `template-examples/` (global Markdown/HTML).  
@@ -57,8 +61,8 @@ Example schema:
 
 ```yaml
 azure-devops:
-  organization: shubhamgoel02
-  project: "Azure DevOps POC"
+  organization: azure-devops-organization
+  project: "Project Name"
 
 type: wiid
 wiid: 1234
@@ -72,6 +76,11 @@ export:
   type:
     - pdf
     - word
+    - html
+    - md
+    - excel
+    - json
+    - csv
   depth:
     parent: 0
     child: 1
@@ -110,36 +119,12 @@ Templates are Scriban text files. The renderer exposes a model:
 }
 ```
 
-Use loops/conditionals to render headers and hierarchy, for example:
-
-```scriban
-{{ ui.title }}
-Generated at {{ export_meta.generated_at }}
-
-{{ for work_item in work_items }}
-ID: {{ work_item.id }}
-Title: {{ work_item.fields["System.Title"] ?? "?" }}
-
-{{ if work_item.children.size > 0 }}
-Children:
-{{ for child in work_item.children }}
-- {{ child.id }} - {{ child.fields["System.Title"] }}
-{{ end }}
-{{ end }}
-{{ end }}
-```
-
 Templates for Word and PDF treat each newline as a paragraph/line, so control spacing with blank lines or separators.
 
 
 ## Templates Included
 
-- `template-examples/markdown-template.scriban` and `markdown-template-child.scriban`
-- `template-examples/html-template-parent.scriban` / `html-template-child.scriban`
-- `template-examples/pdf-template.scriban`
-- `template-examples/word-template.scriban`
-
-Customize them or add new ones—just point `configuration.yaml` at the file.
+Sample templates live in the template examples folder. See [template-examples](https://github.com/TechGOELogy/azure-devops-workitems-exporter/tree/main/src/AzureDevOpsWorkItemExporter/template-examples) for full examples and Scriban patterns. For deeper syntax and built-ins, read the [Scriban documentation](https://raw.githubusercontent.com/scriban/scriban/master/doc/language.md).
 
 
 ## Logs
@@ -151,11 +136,11 @@ Customize them or add new ones—just point `configuration.yaml` at the file.
 ## Contribution & Releases
 
 1. Update `.csproj` version metadata (`Version`, `AssemblyVersion`, `FileVersion`, `InformationalVersion`) for each release.  
-2. Keep README/docs in sync—document template changes, CLI flags, or logging adjustments.  
+2. Keep README/docs in sync - document template changes, CLI flags, or logging adjustments.  
 3. Add tests under `tests/AzureDevOpsWorkItemExporter.Tests` when altering export/hierarchy logic, and ensure `dotnet test` passes before merging.  
 4. Optional: add GitHub Actions to run `dotnet test` and build the CLI for automatic validation on PRs.  
 
 
 ## About the Hosted Documentation
 
-This `docs/index.md` is published via GitHub Pages (set Pages source to the `docs/` folder) providing CLI instructions, configuration schema, template guidance, logging behavior, and contributor notes—perfect for consuming online before cloning the repo.
+This `docs/index.md` is published via GitHub Pages (set Pages source to the `docs/` folder) providing CLI instructions, configuration schema, template guidance, logging behavior, and contributor notes-perfect for consuming online before cloning the repo.
