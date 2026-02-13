@@ -53,7 +53,7 @@ jobs:
         if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
         run: |
           mkdir /tmp/scanner
-          dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
+          dotnet tool update dotnet-sonarscanner --tool-path /tmp/scanner
 
       - name: Prepare SonarQube Analysis
         env:
