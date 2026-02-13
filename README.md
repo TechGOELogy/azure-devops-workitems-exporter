@@ -7,7 +7,7 @@ CLI first exporter that fetches Azure DevOps work items (via WIQL/query ID/paren
 This tool was specifically made by GPT-5.3 Codex fully. Estimated Codex contribution: 85%.
 
 1. **CLI driven** - accepts `--config`, `--pat`, `--output`, `--dry-run`, `--version`. Config points at `configuration.yaml` with Azure DevOps connection metadata, export depth controls, templates paths, and logging overrides.
-2. **Templating with Scriban** - supply per-format Scriban files for Word/PDF/HTML/Markdown; the renderer passes `work_items`, `selected_fields`, and `export_meta` (title/generation time/organization/project/query/link/depth/retry/formats) so templates can iterate over hierarchy, display fields, and add headers/sections.
+2. **Templating with Scriban** - supply per-format Scriban files for Word/PDF/HTML/Markdown; the renderer passes `work_items`, `selected_fields`, and `export_meta` (title/generation time/organization/project/query/link/depth/retry/formats) so templates can iterate over hierarchy, display fields, and add headers/sections. Word/PDF templates should output HTML so formatting is preserved in DOCX/PDF conversion.
 3. **Structured exporters** - CSV/JSON/Excel honor the `select` block (required for those formats); template outputs always receive full field sets so your Scriban logic can include any Azure DevOps property. Each export logs start/complete messages and writes outputs into `export-<timestamp>` folders from the base directory.
 4. **Robust logging** - console shows timestamped severity lines, PDF/Word exports log their start/finish, JSON logfile per run tracks history with intensity control plus PAT masking and log location override.
 5. **Versioned, self-contained** - `.csproj` declares `1.0.0` metadata, and the CLI prints name + version before running (and logs it per run).
@@ -45,7 +45,7 @@ Title: {{ work_item.fields["System.Title"] }}
 {{~ end ~}}
 ```
 
-Word/PDF templates treat each text line as a paragraph/line; adjust spacing with blank lines or custom separators (`----`). Use `selected_fields` or `export_meta.formats` to drive conditional sections; the renderer passes complete Azure DevOps fields plus hierarchy arrays (`work_item.children`, `work_item.parents`).
+Word/PDF templates should emit HTML tags (for example `<strong>`, `<em>`, `<ul>`, `<table>`) since the CLI converts HTML into DOCX/PDF. Use `selected_fields` or `export_meta.formats` to drive conditional sections; the renderer passes complete Azure DevOps fields plus hierarchy arrays (`work_item.children`, `work_item.parents`).
 
 ## Contribution
 

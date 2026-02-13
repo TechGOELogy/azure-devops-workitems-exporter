@@ -7,9 +7,6 @@ using System.Text.Json;
 using AzureDevOpsWorkItemExporter.Logging;
 using AzureDevOpsWorkItemExporter.Services;
 using ClosedXML.Excel;
-using DocumentFormat.OpenXml;
-using DocumentFormat.OpenXml.Packaging;
-using DocumentFormat.OpenXml.Wordprocessing;
 
 namespace AzureDevOpsWorkItemExporter.Templates;
 
@@ -17,6 +14,8 @@ public sealed class FormatExporterService
 {
     private readonly TemplateRenderer _renderer;
     private readonly IReadOnlyDictionary<string, string> _templatePaths;
+    private readonly IHtmlToDocxConverter _docxConverter;
+    private readonly IHtmlToPdfRenderer _pdfRenderer;
 
     private static readonly Dictionary<string, string> DefaultTemplates = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -27,10 +26,16 @@ public sealed class FormatExporterService
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public FormatExporterService(TemplateRenderer renderer, IReadOnlyDictionary<string, string>? templatePaths = null)
+    public FormatExporterService(
+        TemplateRenderer renderer,
+        IReadOnlyDictionary<string, string>? templatePaths = null,
+        IHtmlToDocxConverter? docxConverter = null,
+        IHtmlToPdfRenderer? pdfRenderer = null)
     {
         _renderer = renderer;
         _templatePaths = templatePaths ?? DefaultTemplates;
+        _docxConverter = docxConverter ?? new HtmlToDocxConverter();
+        _pdfRenderer = pdfRenderer ?? new PuppeteerPdfRenderer();
     }
 
     public IReadOnlyDictionary<string, ExportArtifact> ExportFormattedOutputs(ExportContext context)
@@ -105,8 +110,8 @@ public sealed class FormatExporterService
         var rendered = _renderer.Render(templatePath, templateContext);
         return normalizedKey switch
         {
-            "word" => ExportArtifact.FromBytes(BuildWord(rendered)),
-            "pdf" => ExportArtifact.FromBytes(BuildPdf(rendered)),
+            "word" => ExportArtifact.FromBytes(_docxConverter.Convert(rendered)),
+            "pdf" => ExportArtifact.FromBytes(_pdfRenderer.Render(rendered)),
             _ => ExportArtifact.FromText(rendered)
         };
     }
@@ -171,144 +176,6 @@ public sealed class FormatExporterService
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         return stream.ToArray();
-    }
-
-    private static byte[] BuildWord(string content)
-    {
-        using var stream = new MemoryStream();
-        using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document, true))
-        {
-            var mainPart = document.AddMainDocumentPart();
-            mainPart.Document = new Document();
-            var body = mainPart.Document.AppendChild(new Body());
-
-            foreach (var line in NormalizeLines(content))
-            {
-                var paragraph = new Paragraph();
-                var run = new Run();
-                run.AppendChild(new Text(line));
-                paragraph.AppendChild(run);
-                body.AppendChild(paragraph);
-            }
-
-            mainPart.Document.Save();
-        }
-        return stream.ToArray();
-    }
-
-    private static byte[] BuildPdf(string content)
-    {
-        using var stream = new MemoryStream();
-        var lines = NormalizeLines(content).ToList();
-        var maxLines = 45;
-        var visibleLines = lines.Take(maxLines).ToList();
-
-        var contentBuilder = new StringBuilder();
-        contentBuilder.AppendLine("BT");
-        contentBuilder.AppendLine("/F1 12 Tf");
-        contentBuilder.AppendLine("14 TL");
-        contentBuilder.AppendLine("40 760 Td");
-        foreach (var line in visibleLines)
-        {
-            contentBuilder.Append('(');
-            contentBuilder.Append(EscapePdf(line));
-            contentBuilder.AppendLine(") Tj");
-            contentBuilder.AppendLine("T*");
-        }
-        contentBuilder.AppendLine("ET");
-
-        var contentBytes = Encoding.ASCII.GetBytes(contentBuilder.ToString());
-
-        using var writer = new StreamWriter(stream, Encoding.ASCII, leaveOpen: true);
-        writer.WriteLine("%PDF-1.4");
-        writer.Flush();
-
-        var offsets = new List<long> { 0 };
-
-        WriteObject(writer, stream, offsets, 1, "<< /Type /Catalog /Pages 2 0 R >>", null);
-        WriteObject(writer, stream, offsets, 2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", null);
-        WriteObject(writer, stream, offsets, 3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>", null);
-        WriteObject(writer, stream, offsets, 4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", null);
-        WriteObject(writer, stream, offsets, 5, $"<< /Length {contentBytes.Length} >>", contentBytes);
-
-        var xrefStart = stream.Position;
-        writer.WriteLine("xref");
-        writer.WriteLine($"0 {offsets.Count}");
-        writer.WriteLine("0000000000 65535 f ");
-        for (var i = 1; i < offsets.Count; i++)
-        {
-            writer.WriteLine($"{offsets[i]:0000000000} 00000 n ");
-        }
-
-        writer.WriteLine("trailer");
-        writer.WriteLine($"<< /Size {offsets.Count} /Root 1 0 R >>");
-        writer.WriteLine("startxref");
-        writer.WriteLine(xrefStart);
-        writer.WriteLine("%%EOF");
-        writer.Flush();
-
-        return stream.ToArray();
-    }
-
-    private static IEnumerable<string> NormalizeLines(string content)
-    {
-        if (string.IsNullOrEmpty(content))
-        {
-            yield return string.Empty;
-            yield break;
-        }
-
-        using var reader = new StringReader(content);
-        string? line;
-        while ((line = reader.ReadLine()) != null)
-        {
-            yield return line;
-        }
-    }
-
-    private static void WriteObject(StreamWriter writer, Stream stream, List<long> offsets, int id, string body, byte[]? streamBytes)
-    {
-        offsets.Add(stream.Position);
-        writer.WriteLine($"{id} 0 obj");
-        writer.WriteLine(body);
-        if (streamBytes is not null)
-        {
-            writer.WriteLine("stream");
-            writer.Flush();
-            stream.Write(streamBytes, 0, streamBytes.Length);
-            writer.WriteLine();
-            writer.WriteLine("endstream");
-        }
-        writer.WriteLine("endobj");
-        writer.Flush();
-    }
-
-    private static string EscapePdf(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
-
-        var sanitized = new StringBuilder(value.Length);
-        foreach (var ch in value)
-        {
-            if (ch > 127)
-            {
-                sanitized.Append('?');
-                continue;
-            }
-
-            sanitized.Append(ch switch
-            {
-                '(' => "\\(",
-                ')' => "\\)",
-                '\\' => "\\\\",
-                _ => ch.ToString()
-            });
-        }
-
-        return sanitized.ToString();
     }
 
     private static IEnumerable<WorkItemNode> FlattenNodes(IReadOnlyList<WorkItemNode> nodes)

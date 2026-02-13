@@ -1,37 +1,43 @@
-{{~ # PDF template (text-based; renders line-by-line) ~}}
-{{~ if export_meta.title ~}}
-{{ export_meta.title }}
-{{~ end ~}}
-Generated: {{ export_meta.generated_at }}
-Project: {{ export_meta.organization ?? "-" }}/{{ export_meta.project ?? "-" }}
-{{~ if export_meta.formats && export_meta.formats.size > 0 ~}}
-Formats: {{~ for f in export_meta.formats ~}}{{ if for.index > 0 }}, {{ end }}{{ f }}{{~ end ~}}
-{{~ end ~}}
+<html>
+  <head>
+    <title> Work Item Export </title>
+  </head>
+  <body>
+    {{ for work_item in work_items }}
+      <h2> {{ work_item.fields["System.WorkItemType"] }} - {{ work_item.fields["System.Id"] }} : {{ work_item.fields["System.Title"] }} </h2>
+      <b> State </b> : {{ work_item.fields["System.State"] ?? "Undefined" }} <br>
+      <b> Assigned To </b> : &nbsp;
+      {{ assigned = work_item.fields["System.AssignedTo"] }}
+      {{ display_name = "" }}
 
-{{~ for work_item in work_items ~}}
-ID {{ work_item.id }} | {{ work_item.fields["System.Title"] ?? "Untitled" }}
-State: {{ work_item.fields["System.State"] ?? "Unknown" }} | Assigned: {{ work_item.fields["System.AssignedTo"] ?? "Unassigned" }}
-Level: {{ work_item.level ?? 0 }}
+      {{ for item in assigned }}
+        {{ if item.key == "displayName" }}
+          {{ display_name = item.value }}
+        {{ end }}
+      {{ end }}
 
-{{~ if selected_fields.size > 0 ~}}
-{{~ for field in selected_fields ~}}
-{{ field }}: {{ work_item.fields[field] ?? "-" }}
-{{~ end ~}}
-{{~ end ~}}
+      {{ display_name }}
 
-{{~ if work_item.children.size > 0 ~}}
-Children:
-{{~ for child in work_item.children ~}}
-- {{ child.id }}: {{ child.fields["System.Title"] ?? "Untitled" }}
-{{~ end ~}}
-{{~ end ~}}
+      <br>
 
-{{~ if work_item.parents.size > 0 ~}}
-Parents:
-{{~ for parent in work_item.parents ~}}
-- {{ parent.id }}: {{ parent.fields["System.Title"] ?? "Untitled" }}
-{{~ end ~}}
-{{~ end ~}}
+      {{ if work_item.children.size > 0 }}
+        {{ for child in work_item.children }}
+          <h3> {{ child.fields["System.WorkItemType"] }} - {{ child.fields["System.Id"] }} : {{ child.fields["System.Title"] }} </h3>
+          <b> State </b> : {{ child.fields["System.State"] ?? "Undefined" }} <br>
+          <b> Assigned To </b> : &nbsp;
+          {{ assigned = work_item.fields["System.AssignedTo"] }}
+          {{ display_name = "" }}
 
-------------------------------------------------------------
-{{~ end ~}}
+          {{ for item in assigned }}
+            {{ if item.key == "displayName" }}
+              {{ display_name = item.value }}
+            {{ end }}
+          {{ end }}
+
+          {{ display_name }}
+        {{ end }}
+      {{ end }}
+
+    {{ end }}
+  </body>
+</html>

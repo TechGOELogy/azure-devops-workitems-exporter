@@ -22,7 +22,9 @@ public class FormatExporterServiceTests
             ["md"] = Path.Combine(templateBase, "markdown-template.scriban"),
             ["html"] = Path.Combine(templateBase, "html-template.scriban")
         };
-        var exporter = new FormatExporterService(renderer, templatePaths);
+        var docxConverter = new StubDocxConverter();
+        var pdfRenderer = new StubPdfRenderer();
+        var exporter = new FormatExporterService(renderer, templatePaths, docxConverter, pdfRenderer);
 
         var nodes = new List<WorkItemNode>
         {
@@ -115,7 +117,9 @@ public class FormatExporterServiceTests
             ["word"] = Path.Combine(templateBase, "markdown-template.scriban"),
             ["pdf"] = Path.Combine(templateBase, "markdown-template.scriban")
         };
-        var exporter = new FormatExporterService(renderer, templatePaths);
+        var docxConverter = new StubDocxConverter();
+        var pdfRenderer = new StubPdfRenderer();
+        var exporter = new FormatExporterService(renderer, templatePaths, docxConverter, pdfRenderer);
 
         var nodes = new List<WorkItemNode>
         {
@@ -138,6 +142,8 @@ public class FormatExporterServiceTests
         Assert.NotEmpty(output["word"].Bytes!);
         Assert.NotNull(output["pdf"].Bytes);
         Assert.NotEmpty(output["pdf"].Bytes!);
+        Assert.NotNull(docxConverter.LastHtml);
+        Assert.NotNull(pdfRenderer.LastHtml);
     }
 
     [Fact]
@@ -292,19 +298,20 @@ public class FormatExporterServiceTests
     }
 
     [Fact]
-    public void ExportFormattedOutputs_PdfEscapesNonAsciiAndParens()
+    public void ExportFormattedOutputs_RendersHtmlForPdf()
     {
         var repoRoot = LocateRepoRoot();
         var renderer = new TemplateRenderer(repoRoot);
 
         var tempTemplate = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.scriban");
-        File.WriteAllText(tempTemplate, "Résumé (Sample)");
+        File.WriteAllText(tempTemplate, "<strong>{{ work_items[0].fields[\"System.Title\"] }}</strong>");
 
         var templatePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["pdf"] = tempTemplate
         };
-        var exporter = new FormatExporterService(renderer, templatePaths);
+        var pdfRenderer = new StubPdfRenderer();
+        var exporter = new FormatExporterService(renderer, templatePaths, new StubDocxConverter(), pdfRenderer);
 
         var nodes = new List<WorkItemNode>
         {
@@ -321,12 +328,8 @@ public class FormatExporterServiceTests
             }
         };
 
-        var output = exporter.ExportFormattedOutputs(context);
-        var bytes = output["pdf"].Bytes ?? Array.Empty<byte>();
-        var ascii = Encoding.ASCII.GetString(bytes);
-
-        Assert.Contains("\\(", ascii);
-        Assert.Contains("?", ascii);
+        exporter.ExportFormattedOutputs(context);
+        Assert.Contains("<strong>Root</strong>", pdfRenderer.LastHtml ?? string.Empty);
     }
 
     private static string LocateRepoRoot()
@@ -339,4 +342,27 @@ public class FormatExporterServiceTests
 
         return dir?.FullName ?? AppContext.BaseDirectory;
     }
+
+    private sealed class StubDocxConverter : IHtmlToDocxConverter
+    {
+        public string? LastHtml { get; private set; }
+
+        public byte[] Convert(string html)
+        {
+            LastHtml = html;
+            return Encoding.UTF8.GetBytes("docx");
+        }
+    }
+
+    private sealed class StubPdfRenderer : IHtmlToPdfRenderer
+    {
+        public string? LastHtml { get; private set; }
+
+        public byte[] Render(string html)
+        {
+            LastHtml = html;
+            return Encoding.UTF8.GetBytes("pdf");
+        }
+    }
 }
+

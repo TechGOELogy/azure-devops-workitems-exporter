@@ -23,7 +23,7 @@ Use the `configuration.yaml` in the repo root (copy it, adjust your organization
 
 1. **Flexible selectors**: `config.type` accepts `wiql` (run a WIQL query) or `wiid` (single ID with parent/child traversal). When WIQL is specified, the `export.link` and `export.depth` blocks are ignored - the WIQL results are authoritative (but `select` still governs CSV/JSON/Excel columns).  
 2. **Depth-controlled hierarchy**: specify `export.link` (child/parent/both/workitem) plus `export.depth.parent`/`export.depth.child`. Only immediate connections are fetched for structured exports, yet templates can traverse the full hierarchy.  
-3. **Multiple formats**: choose from `word`, `pdf`, `html`, `md`, `csv`, `json`, `excel` (more easily extendable via templates). PDF/Word exports use Scriban templates that treat each line as a paragraph/line; structured formats rely on selected fields.  
+3. **Multiple formats**: choose from `word`, `pdf`, `html`, `md`, `csv`, `json`, `excel` (more easily extendable via templates). Word/PDF templates render HTML that is converted to DOCX/PDF; structured formats rely on selected fields.  
 4. **Template management**: declare paths under `templates` (per format) in `configuration.yaml`. Fallback templates are under `template-examples/` (global Markdown/HTML).  
 5. **Robust logging**: console logs with severity, a JSON history log per run, per-format start/complete messages, and PAT masking in CLI arguments.
 
@@ -119,7 +119,9 @@ Templates are Scriban text files. The renderer exposes a model:
 }
 ```
 
-Templates for Word and PDF treat each newline as a paragraph/line, so control spacing with blank lines or separators.
+### Word/PDF HTML Templates
+
+For Word and PDF, your Scriban template should output HTML (for example: `<strong>`, `<em>`, `<ul>`, `<table>`). The CLI converts that HTML into a DOCX or PDF during export, so formatting is controlled by the HTML you emit.
 
 
 ## Templates Included
