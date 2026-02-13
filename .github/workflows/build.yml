@@ -52,14 +52,14 @@ jobs:
       - name: Install SonarQube Cloud scanner
         if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
         run: |
-          mkdir ${{ runner.temp }}\scanner
+          mkdir \tmp\scanner
           dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
 
       - name: Prepare SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"TechGOELogy_azure-devops-workitems-exporter" /o:"techgoelogy" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" 
+          \tmp\scanner\dotnet-sonarscanner begin /k:"TechGOELogy_azure-devops-workitems-exporter" /o:"techgoelogy" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" 
 
       - name: Build
         run: dotnet build azure-devops-workitems-exporter.slnx --configuration Release --no-restore
@@ -75,7 +75,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          \tmp\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
       
       - name: Publish Cobertura Report
         uses: 5monkeys/cobertura-action@v14
